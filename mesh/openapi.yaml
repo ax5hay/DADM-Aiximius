@@ -1,0 +1,302 @@
+# DADM Zero-Trust Mesh — Example Secure API Definitions
+# See docs/ZERO-TRUST-MESH.md for architecture, auth, key lifecycle, enrollment, revocation.
+
+openapi: 3.0.3
+info:
+  title: DADM Mesh Secure APIs
+  description: Enrollment, certificate rotation, CRL, gossip, and DTN bundle APIs. All mesh endpoints expect TLS 1.3 with mutual authentication unless noted.
+  version: 1.0.0
+
+servers:
+  - url: https://mesh.example.com/v1
+    description: Mesh / Fusion (enrollment, CA, CRL)
+  - url: https://node-local/v1
+    description: Per-node mesh API (gossip, bundles)
+
+tags:
+  - name: Enrollment
+  - name: Rotation
+  - name: Revocation
+  - name: Gossip
+  - name: Bundles
+
+paths:
+  /enroll:
+    post:
+      tags: [Enrollment]
+      summary: Node enrollment
+      description: One-time enrollment with token and CSR; optional attestation. Returns leaf cert, CA cert, and mesh config.
+      operationId: enroll
+      security: []  # Token is the auth; or TLS with provisional cert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, csr]
+              properties:
+                token:
+                  type: string
+                  description: One-time enrollment token
+                csr:
+                  type: string
+                  format: byte
+                  description: PEM or base64-encoded CSR
+                attestation:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum: [tpm_quote, safetynet, app_attest]
+                    payload:
+                      type: string
+                      format: byte
+                node_id:
+                  type: string
+                  description: Requested node_id (optional)
+      responses:
+        '201':
+          description: Enrolled; certificate and config returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  certificate:
+                    type: string
+                    format: byte
+                  ca_cert:
+                    type: string
+                    format: byte
+                  config:
+                    type: object
+                    properties:
+                      bootstrap_peers:
+                        type: array
+                        items: { type: string }
+                      gossip_fanout:
+                        type: integer
+                      crl_url:
+                        type: string
+        '400':
+          description: Invalid CSR or token
+        '403':
+          description: Attestation failed or policy denied
+
+  /rotate:
+    post:
+      tags: [Rotation]
+      summary: Certificate rotation
+      description: Request new certificate; TLS client cert (current mesh cert) required.
+      operationId: rotate
+      security:
+        - mutualTLS: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csr]
+              properties:
+                csr:
+                  type: string
+                  format: byte
+                attestation:
+                  type: object
+                  properties:
+                    type: { type: string }
+                    payload: { type: string, format: byte }
+                current_cert_serial:
+                  type: string
+      responses:
+        '200':
+          description: New certificate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  certificate: { type: string, format: byte }
+                  valid_not_before: { type: string, format: date-time }
+                  valid_not_after: { type: string, format: date-time }
+        '401':
+          description: No or invalid client cert
+        '403':
+          description: Attestation or policy failure
+
+  /crl:
+    get:
+      tags: [Revocation]
+      summary: Get Certificate Revocation List
+      description: Signed CRL; public endpoint. Clients validate peer certs against this.
+      operationId: getCrl
+      security: []
+      responses:
+        '200':
+          description: CRL (DER or PEM)
+          content:
+            application/octet-stream: {}
+            application/x-pem-file: {}
+        '304':
+          description: Not modified (use cached)
+
+  /revoke:
+    post:
+      tags: [Revocation]
+      summary: Revoke certificate (admin)
+      description: Internal/admin only. Adds serial to CRL.
+      operationId: revoke
+      security:
+        - adminAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [serial]
+              properties:
+                serial: { type: string }
+                reason: { type: string }
+                node_id: { type: string }
+      responses:
+        '204':
+          description: Revoked
+        '401':
+          description: Unauthorized
+
+  /mesh/peers:
+    get:
+      tags: [Gossip]
+      summary: List peers
+      description: Connected or known peer node_ids and status. TLS client cert required.
+      operationId: listPeers
+      security:
+        - mutualTLS: []
+      responses:
+        '200':
+          description: Peer list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  peers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        node_id: { type: string }
+                        status: { type: string, enum: [connected, last_seen] }
+                        last_seen: { type: string, format: date-time }
+        '401':
+          description: No or invalid client cert
+
+  /mesh/gossip:
+    post:
+      tags: [Gossip]
+      summary: Submit gossip message
+      description: Signed anomaly-signature message; queued for propagation. TLS + signature verification.
+      operationId: submitGossip
+      security:
+        - mutualTLS: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_id, origin, payload, timestamp, signature]
+              properties:
+                message_id: { type: string }
+                origin: { type: string }
+                payload: { type: string, format: byte }
+                timestamp: { type: string, format: date-time }
+                signature: { type: string, format: byte }
+                ttl_sec: { type: integer }
+      responses:
+        '202':
+          description: Accepted for propagation
+        '400':
+          description: Invalid or duplicate message
+        '401':
+          description: No or invalid client cert
+        '403':
+          description: Origin revoked or signature invalid
+
+  /bundles:
+    post:
+      tags: [Bundles]
+      summary: Submit DTN bundle
+      description: Store-and-forward bundle. TLS client cert required.
+      operationId: submitBundle
+      security:
+        - mutualTLS: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [destination, ttl_sec, payload]
+              properties:
+                destination:
+                  type: string
+                  description: node_id or "broadcast"
+                ttl_sec: { type: integer }
+                payload: { type: string, format: byte }
+      responses:
+        '201':
+          description: Bundle accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundle_id: { type: string }
+                  expires_at: { type: string, format: date-time }
+        '401':
+          description: No or invalid client cert
+
+    get:
+      tags: [Bundles]
+      summary: Get bundles for this node
+      description: Bundles destined for this node or to forward. TLS client cert required.
+      operationId: getBundles
+      security:
+        - mutualTLS: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 100 }
+      responses:
+        '200':
+          description: List of bundles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bundles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bundle_id: { type: string }
+                        destination: { type: string }
+                        payload: { type: string, format: byte }
+                        expires_at: { type: string, format: date-time }
+        '401':
+          description: No or invalid client cert
+
+components:
+  securitySchemes:
+    mutualTLS:
+      type: mutualTLS
+      description: TLS 1.3 with client certificate (mesh leaf cert)
+    adminAuth:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+      description: Admin or internal service token

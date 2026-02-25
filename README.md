@@ -75,11 +75,15 @@ DADM-Aiximius/
 │   ├── api.py             # REST API + dashboard queries
 │   ├── examples/         # Cypher dashboard queries
 │   └── README.md
+├── mesh/                  # Zero-trust communication mesh (design + API spec)
+│   ├── openapi.yaml      # Example secure APIs (enrollment, rotation, CRL, gossip, DTN)
+│   └── README.md
 └── docs/                  # Architecture and design
     ├── ARCHITECTURE.md    # System architecture, security, model lifecycle
     ├── EDGE-MODEL-DESIGN.md
     ├── FEDERATED-LEARNING.md
     ├── DSO-ONTOLOGY.md    # Defense Systems Ontology & graph
+    ├── ZERO-TRUST-MESH.md # TLS, attestation, rotation, revocation, gossip, DTN
     └── architecture-diagram.mmd
 ```
 
@@ -145,6 +149,7 @@ python api.py
 | **training** | Train anomaly model (autoencoder / Isolation Forest); export ONNX; quantize; drift detection; explainability. | Python, PyTorch, ONNX |
 | **federated** | Secure FL: clients send only encrypted gradient updates; server decrypts and aggregates; model versioning and rollback; air-gap export. | Python, Flask, cryptography |
 | **graph** | Defense Systems Ontology: devices, events, risk scores, time windows, clusters. Risk propagation; unsupervised clustering for coordinated spikes; surveillance summary (non-intrusive); REST API. | Python, Neo4j, Flask |
+| **mesh** | Zero-trust communication: TLS 1.3 mutual auth, hardware-backed keys, attestation, certificate rotation, CRL/revocation, encrypted gossip for anomaly signatures, delay-tolerant bundles. Design + OpenAPI spec. | Design, OpenAPI 3.0 |
 
 ---
 
@@ -156,6 +161,7 @@ python api.py
 | [EDGE-MODEL-DESIGN.md](docs/EDGE-MODEL-DESIGN.md) | Feature schema, model choice, training pipeline, ONNX, quantization, drift, explainability. |
 | [FEDERATED-LEARNING.md](docs/FEDERATED-LEARNING.md) | Federated protocol, secure aggregation, compression, versioning, verification, failure recovery. |
 | [DSO-ONTOLOGY.md](docs/DSO-ONTOLOGY.md) | Defense Systems Ontology schema, graph data model, risk propagation, clustering, API, dashboard queries. |
+| [ZERO-TRUST-MESH.md](docs/ZERO-TRUST-MESH.md) | Zero-trust mesh: network architecture, auth flow, key lifecycle, enrollment, revocation, gossip, DTN; example secure APIs. |
 
 ---
 

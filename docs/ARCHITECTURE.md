@@ -366,9 +366,24 @@ Features are derived from a sliding window of process, network, file integrity, 
 
 ---
 
+## 11. Zero-Trust Communication Mesh
+
+**Purpose:** Secure, delay-tolerant overlay for node-to-node communication: TLS, hardware-backed keys, attestation, certificate rotation, encrypted gossip for anomaly signatures.
+
+- **Network:** Overlay with peer discovery (mDNS/DHT/bootstrap); TLS 1.3 mutual auth; store-and-forward bundles for DTN when peers are unavailable.
+- **Authentication:** Mutual TLS; both sides present mesh certificate; chain to mesh root or fusion CA; optional post-handshake attestation (TPM quote, SafetyNet, etc.).
+- **Keys:** Identity key in TPM/Secure Enclave/Keystore where available; node certificate for TLS; rotation with overlap and revocation (CRL or mesh CRL gossip).
+- **Enrollment:** Token + CSR + optional attestation → CA issues leaf cert and mesh config; air-gap via internal enrollment endpoint.
+- **Revocation:** CRL (or delta) published and optionally gossiped; nodes reject connections and drop gossip from revoked certs.
+- **Gossip:** Signed anomaly-signature messages (no raw logs); encrypted by TLS; dedupe and fan-out; DTN so messages propagate when connectivity returns.
+
+**Detailed design:** [ZERO-TRUST-MESH.md](ZERO-TRUST-MESH.md). **Example APIs:** `mesh/openapi.yaml` (enrollment, rotation, CRL, gossip, bundles).
+
+---
+
 ## Document Control
 
 - **Created:** 2025-02-26  
-- **Updated:** 2025-02-26 (Section 8 Edge Model; Section 9 Secure Federated Learning; Section 10 DSO Graph)  
+- **Updated:** 2025-02-26 (Section 8–11: Edge Model, Federated Learning, DSO Graph, Zero-Trust Mesh)  
 - **Status:** Draft for review  
-- **Next:** Detailed protocol specs (mesh sync, federated rounds), API definitions, and deployment runbooks for single-device vs cluster vs air-gap.
+- **Next:** Detailed protocol specs (mesh sync, federated rounds), API implementations, and deployment runbooks for single-device vs cluster vs air-gap.
