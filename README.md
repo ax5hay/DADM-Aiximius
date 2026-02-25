@@ -7,6 +7,11 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Aiximius/DADM-Aiximius/actions"><img src="https://github.com/Aiximius/DADM-Aiximius/actions/workflows/rust.yml/badge.svg" alt="Rust CI" /></a>
+  <a href="https://github.com/Aiximius/DADM-Aiximius/actions"><img src="https://github.com/Aiximius/DADM-Aiximius/actions/workflows/python.yml/badge.svg" alt="Python CI" /></a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Rust-agent-dea584?style=flat-square&logo=rust&logoColor=white" alt="Rust" />
   <img src="https://img.shields.io/badge/Python-training%20%7C%20federated%20%7C%20graph-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/ONNX-inference-2d7dd2?style=flat-square" alt="ONNX" />
@@ -30,6 +35,8 @@
 - [Testing and CI](#testing-and-ci)
 - [Documentation](#documentation)
 - [Architecture at a glance](#architecture-at-a-glance)
+
+See also [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -111,6 +118,10 @@ DADM-Aiximius/
 ├── .github/workflows/     # CI: Rust (fmt, clippy, test), Python (pytest), Lint (ruff, YAML), Docker build, Deploy verify
 ├── docker-compose.yml     # Neo4j, Fusion, Graph, Reasoning, Mesh
 ├── pyproject.toml         # Ruff config, pytest config
+├── Makefile               # test, fmt, lint, docker-up/down
+├── CHANGELOG.md           # Version history
+├── CONTRIBUTING.md        # How to contribute
+├── SECURITY.md            # Vulnerability reporting
 └── README.md
 ```
 

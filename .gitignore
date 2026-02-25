@@ -1,0 +1,92 @@
+# DADM-Aiximius — language, IDE, OS, and deployment ignores
+
+# ---- Rust (agent) ----
+/agent/target/
+**/*.rs.bk
+# Cargo.lock is committed for the agent binary (reproducible builds)
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+env/
+
+# ---- Environment and secrets ----
+.env
+.env.local
+.env.*.local
+*.pem
+!**/schemas/*.json
+server_keys/
+registry/
+mesh_data/
+
+# ---- IDEs and editors ----
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Testing and coverage ----
+.coverage
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+
+# ---- Logs and local data ----
+*.log
+*.sqlite
+*.db
+!**/examples/**/*.db
+
+# ---- Docker ----
+.docker/
+
+# ---- Terraform and Ansible ----
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+
+# ---- Build and temp ----
+*.onnx
+!**/examples/**/
+*.pt
+*.pth
+out/
+signed_package/

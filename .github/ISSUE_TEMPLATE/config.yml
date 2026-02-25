@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/Aiximius/DADM-Aiximius/tree/main/docs
+    about: Architecture, runbook, and design docs
+  - name: Discussions
+    url: https://github.com/Aiximius/DADM-Aiximius/discussions
+    about: Questions and ideas
