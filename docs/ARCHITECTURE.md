@@ -351,9 +351,24 @@ Features are derived from a sliding window of process, network, file integrity, 
 
 ---
 
+## 10. Defense Systems Ontology (DSO) & Graph Engine
+
+**Purpose:** Correlate anomalies across distributed nodes; risk propagation; cluster detection for coordinated anomaly spikes; non-intrusive surveillance tracking.
+
+- **Ontology:** Device, Event, RiskScore, TimeWindow, Cluster, SurveillanceSubject; stable node IDs (`did:`, `evt:`, `clu:`, `win:`, `subj:`).
+- **Graph (Neo4j):** Nodes and relationships (REPORTS, HAS_RISK_IN, MEMBER_OF, COMMUNICATES_WITH, TRACKED_AS, PROPAGATES_TO); indexes for query performance.
+- **Risk propagation:** Propagate risk along COMMUNICATES_WITH and cluster membership; decay and max hops configurable.
+- **Clustering:** Unsupervised grouping of devices with high risk in same window, connected by communication or cluster; outputs Cluster nodes and MEMBER_OF.
+- **API:** Ingest devices/events/risk; trigger propagation and clustering; dashboard queries (high-risk devices, coordinated spikes, surveillance summary, event volume).
+- **Surveillance (non-intrusive):** TRACKED_AS links Device to SurveillanceSubject; only aggregated counts and risk levels, no raw logs.
+
+**Detailed design:** [DSO-ONTOLOGY.md](DSO-ONTOLOGY.md). **Implementation:** `graph/` (schema, Neo4j store, risk propagation, clustering, Flask API, example Cypher queries).
+
+---
+
 ## Document Control
 
 - **Created:** 2025-02-26  
-- **Updated:** 2025-02-26 (Section 8 Edge Model; Section 9 Secure Federated Learning)  
+- **Updated:** 2025-02-26 (Section 8 Edge Model; Section 9 Secure Federated Learning; Section 10 DSO Graph)  
 - **Status:** Draft for review  
 - **Next:** Detailed protocol specs (mesh sync, federated rounds), API definitions, and deployment runbooks for single-device vs cluster vs air-gap.
