@@ -78,12 +78,21 @@ DADM-Aiximius/
 ├── mesh/                  # Zero-trust communication mesh (design + API spec)
 │   ├── openapi.yaml      # Example secure APIs (enrollment, rotation, CRL, gossip, DTN)
 │   └── README.md
+├── reasoning/             # LLM reasoning layer (graph-only, citations, no autonomous action)
+│   ├── schemas/          # explanation_output.json, audit_log_entry.json
+│   └── README.md
+├── deploy/                # Government hardened deployment (Terraform + Ansible)
+│   ├── terraform/        # On-prem cluster provisioning (state in-boundary)
+│   ├── ansible/          # OS hardening, Secure Boot, FIPS, audit, offline model update
+│   └── README.md
 └── docs/                  # Architecture and design
     ├── ARCHITECTURE.md    # System architecture, security, model lifecycle
     ├── EDGE-MODEL-DESIGN.md
     ├── FEDERATED-LEARNING.md
     ├── DSO-ONTOLOGY.md    # Defense Systems Ontology & graph
     ├── ZERO-TRUST-MESH.md # TLS, attestation, rotation, revocation, gossip, DTN
+    ├── LLM-REASONING-LAYER.md  # LLM reasoning: prompts, context, guardrails, audit, explanation
+    ├── GOVERNMENT-DEPLOYMENT.md # Air-gap, signed images, Secure Boot, audit, FIPS, IaC
     └── architecture-diagram.mmd
 ```
 
@@ -150,6 +159,8 @@ python api.py
 | **federated** | Secure FL: clients send only encrypted gradient updates; server decrypts and aggregates; model versioning and rollback; air-gap export. | Python, Flask, cryptography |
 | **graph** | Defense Systems Ontology: devices, events, risk scores, time windows, clusters. Risk propagation; unsupervised clustering for coordinated spikes; surveillance summary (non-intrusive); REST API. | Python, Neo4j, Flask |
 | **mesh** | Zero-trust communication: TLS 1.3 mutual auth, hardware-backed keys, attestation, certificate rotation, CRL/revocation, encrypted gossip for anomaly signatures, delay-tolerant bundles. Design + OpenAPI spec. | Design, OpenAPI 3.0 |
+| **reasoning** | LLM reasoning over event graph only: step-by-step explanation, mandatory citations, confidence score; no autonomous action; guardrails and audit schema. | Design, JSON schemas |
+| **deploy** | Government hardened deployment: air-gap, signed images, Secure Boot, audit logging, offline model update, FIPS; Terraform + Ansible. | Terraform, Ansible |
 
 ---
 
@@ -162,6 +173,8 @@ python api.py
 | [FEDERATED-LEARNING.md](docs/FEDERATED-LEARNING.md) | Federated protocol, secure aggregation, compression, versioning, verification, failure recovery. |
 | [DSO-ONTOLOGY.md](docs/DSO-ONTOLOGY.md) | Defense Systems Ontology schema, graph data model, risk propagation, clustering, API, dashboard queries. |
 | [ZERO-TRUST-MESH.md](docs/ZERO-TRUST-MESH.md) | Zero-trust mesh: network architecture, auth flow, key lifecycle, enrollment, revocation, gossip, DTN; example secure APIs. |
+| [LLM-REASONING-LAYER.md](docs/LLM-REASONING-LAYER.md) | LLM reasoning: prompt design, structured context injection, guardrails, audit logging schema, explanation outputs (citations, confidence). |
+| [GOVERNMENT-DEPLOYMENT.md](docs/GOVERNMENT-DEPLOYMENT.md) | Hardened gov deployment: architecture, secure containers, compliance checklist, supply chain verification, Terraform/Ansible IaC. |
 
 ---
 

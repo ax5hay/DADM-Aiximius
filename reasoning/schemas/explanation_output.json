@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aiximius.github.io/dadm/reasoning/explanation_output.json",
+  "title": "LLM explanation output",
+  "description": "Structured output from the LLM reasoning layer. All claims must cite graph nodes.",
+  "type": "object",
+  "required": ["explanation_steps", "summary", "confidence", "confidence_justification"],
+  "properties": {
+    "explanation_steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["step_number", "claim", "citations"],
+        "properties": {
+          "step_number": { "type": "integer", "minimum": 1 },
+          "claim": { "type": "string" },
+          "citations": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "summary": { "type": "string" },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "confidence_justification": { "type": "string" }
+  }
+}

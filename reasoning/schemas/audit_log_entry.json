@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aiximius.github.io/dadm/reasoning/audit_log_entry.json",
+  "title": "LLM reasoning audit log entry",
+  "description": "One append-only log entry per LLM request/response.",
+  "type": "object",
+  "required": ["id", "ts", "request_id", "prompt_version", "query", "model", "response_type"],
+  "properties": {
+    "id": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "request_id": { "type": "string" },
+    "prompt_version": { "type": "string" },
+    "query": { "type": "string" },
+    "context_node_count": { "type": "integer" },
+    "context_edge_count": { "type": "integer" },
+    "context_node_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "model": { "type": "string" },
+    "response_type": {
+      "type": "string",
+      "enum": ["explanation", "refused", "error", "invalid_output"]
+    },
+    "explanation_summary": { "type": "string" },
+    "confidence": { "type": "number" },
+    "citation_count": { "type": "integer" },
+    "citation_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "all_citations_in_context": { "type": "boolean" },
+    "error_message": { "type": "string" },
+    "latency_ms": { "type": "integer" }
+  }
+}

@@ -1,0 +1,46 @@
+# Audit-compliant logging — structured logs, retention, no egress
+- name: Ensure audit log directory exists
+  ansible.builtin.file:
+    path: "{{ dadm_audit_log_dir | default('/var/log/dadm') }}"
+    state: directory
+    mode: '0750'
+    owner: root
+    group: root
+
+- name: Ensure rsyslog includes structured DADM log config (example)
+  ansible.builtin.copy:
+    dest: /etc/rsyslog.d/99-dadm.conf
+    content: |
+      # DADM audit log — JSON format; local only
+      module(load="omfile")
+      template(name="dadm_json" type="list") {
+        property(name="timestamp" dateFormat="rfc3339")
+        constant(value=" ")
+        property(name="hostname")
+        constant(value=" ")
+        property(name="programname")
+        constant(value=" ")
+        property(name="msg")
+      }
+      if $programname startswith 'dadm' then {
+        action(type="omfile" file="/var/log/dadm/audit.log" template="dadm_json")
+        stop
+      }
+    mode: '0644'
+  notify: restart rsyslog
+  when: ansible_os_family == 'RedHat' or ansible_os_family == 'Debian'
+
+- name: Set log retention (logrotate)
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/dadm
+    content: |
+      /var/log/dadm/*.log {
+        daily
+        rotate {{ dadm_audit_log_retention_days | default(365) }}
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 root root
+      }
+    mode: '0644'

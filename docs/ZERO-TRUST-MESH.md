@@ -6,6 +6,21 @@
 
 ---
 
+## Table of contents
+
+| § | Topic |
+|---|--------|
+| 1 | [Network architecture](#1-network-architecture) |
+| 2 | [Authentication flow](#2-authentication-flow) |
+| 3 | [Key lifecycle management](#3-key-lifecycle-management) |
+| 4 | [Node enrollment process](#4-node-enrollment-process) |
+| 5 | [Revocation protocol](#5-revocation-protocol) |
+| 6 | [Encrypted gossip (anomaly signatures)](#6-encrypted-gossip-based-anomaly-signature-propagation) |
+| 7 | [Delay-tolerant networking (DTN)](#7-delay-tolerant-networking-dtn) |
+| 8 | [Secure API definitions](#8-secure-api-definitions) |
+
+---
+
 ## 1. Network Architecture
 
 ### 1.1 Overlay Model
@@ -192,11 +207,38 @@ Agent uses a single abstraction (e.g. “identity key”) and platform layer res
 
 ---
 
-## 7. Example Secure API Definitions
+## 7. Delay-Tolerant Networking (DTN)
 
-Example APIs for enrollment, CA, and mesh control. Implementations live in repo under `mesh/api/` or similar.
+### 7.1 Model
 
-### 7.1 Enrollment API
+- **Store-and-forward:** Messages (gossip or application payloads) are not dropped when the next hop is unavailable. They are stored as **bundles** and forwarded when the peer comes online or when an alternate path exists.
+- **Bundle:** Logical unit = destination (node_id or broadcast) + TTL + creation time + payload. Optional fragmentation for large payloads.
+- **No assumption of contemporaneous connectivity:** Sender and final recipient need not be online at the same time; intermediate relays hold bundles until delivery or TTL expiry.
+
+### 7.2 Bundle Lifecycle
+
+1. **Submit:** Node A submits a bundle (destination = B or broadcast, TTL, payload) via `POST /v1/bundles`. API accepts and returns bundle_id.
+2. **Store:** Relay or A stores the bundle in a local bundle store (persistent where possible).
+3. **Forward:** When B connects (or a relay that can reach B), the node delivers bundles destined for B; for broadcast, fan-out to all known peers. Remove from store on successful delivery or on TTL expiry.
+4. **Retrieve:** Node B calls `GET /v1/bundles` to pull bundles destined for B (or to forward).
+
+### 7.3 Policy
+
+- **TTL:** Bundles expire; expired bundles are deleted and not forwarded.
+- **Quotas:** Per-node or global bundle queue limits to prevent abuse.
+- **Encryption:** Bundle payload can be encrypted end-to-end (only destination can decrypt) or hop-by-hop (TLS between nodes). Anomaly signatures in gossip can use the same bundle mechanism when peers are offline.
+
+### 7.4 Integration with Gossip
+
+- Gossip messages that cannot be delivered immediately are treated as bundles (destination = broadcast or peer list); stored and re-sent when links are up. This yields **delay-tolerant gossip** so anomaly signatures propagate despite partitions and intermittent connectivity.
+
+---
+
+## 8. Secure API Definitions
+
+Example APIs for enrollment, CA, revocation, gossip, and DTN. Formal spec: **`mesh/openapi.yaml`** (OpenAPI 3.0). Implementations live in repo under `mesh/` or agent/fusion.
+
+### 8.1 Enrollment API
 
 **POST /v1/enroll**
 
@@ -212,7 +254,7 @@ Example APIs for enrollment, CA, and mesh control. Implementations live in repo 
 - **Auth:** None (token is the auth); or TLS with a provisional cert.  
 - **Errors:** 400 invalid CSR/token, 403 attestation failed / policy, 429 rate limit.
 
-### 7.2 Certificate Rotation API
+### 8.2 Certificate Rotation API
 
 **POST /v1/rotate**
 
@@ -224,7 +266,7 @@ Example APIs for enrollment, CA, and mesh control. Implementations live in repo 
 - **Auth:** TLS client cert (current mesh cert).  
 - **Errors:** 401 no/invalid client cert, 403 attestation/policy failure.
 
-### 7.3 CRL / Revocation API
+### 8.3 CRL / Revocation API
 
 **GET /v1/crl**
 
@@ -238,7 +280,7 @@ Example APIs for enrollment, CA, and mesh control. Implementations live in repo 
 - **Response:** 204 No Content.  
 - **Auth:** Admin credential or internal service.
 
-### 7.4 Mesh Health (Authenticated)
+### 8.4 Mesh Health (Authenticated)
 
 **GET /v1/mesh/peers**
 
@@ -251,7 +293,7 @@ Example APIs for enrollment, CA, and mesh control. Implementations live in repo 
 - **Response:** 202 Accepted (message queued for propagation).  
 - **Auth:** TLS client cert. Verifier checks signature and revocation.
 
-### 7.5 Bundle (DTN) API
+### 8.5 Bundle (DTN) API
 
 **POST /v1/bundles**
 
@@ -269,5 +311,6 @@ Example APIs for enrollment, CA, and mesh control. Implementations live in repo 
 ## Document Control
 
 - **Created:** 2025-02-26  
+- **Updated:** 2025-02-26 (Table of contents; §7 DTN; §8 API renumbering)  
 - **Status:** Design approved  
-- **Implementation:** Reference `mesh/` for example API specs and stubs; integrate with agent and fusion in later phases.
+- **Implementation:** `mesh/openapi.yaml` (OpenAPI 3.0); integrate with agent and fusion in later phases.

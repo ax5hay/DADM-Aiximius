@@ -79,7 +79,7 @@ LAYERS:
 | **Sync protocol** | Reliable, ordered (where needed) sync of: gradients, model deltas, config, heartbeat. Conflict resolution via vector clocks or last-write-wins with signed timestamps. |
 | **Topology** | Scale from single node to large cluster; optional super-nodes or gateways for WAN or fusion uplink. |
 
-**Modes:** Full mesh (small N), hierarchical or DHT-based (large N); same protocol, different routing.
+**Modes:** Full mesh (small N), hierarchical or DHT-based (large N); same protocol, different routing. **Full design:** [ZERO-TRUST-MESH.md](ZERO-TRUST-MESH.md) (TLS, hardware-backed keys, attestation, certificate rotation, revocation, encrypted gossip, DTN); API spec `mesh/openapi.yaml`.
 
 ### 2.3 Fusion Server (Aiximius)
 
@@ -381,9 +381,42 @@ Features are derived from a sliding window of process, network, file integrity, 
 
 ---
 
+## 12. LLM-Based Reasoning Layer (Defensive Use)
+
+**Purpose:** Use an LLM to reason over the **structured event graph** (DSO) and produce step-by-step explanations with citations and confidence—**without autonomous action**.
+
+- **Constraints:** LLM cannot take autonomous action; operates only on the structured event graph; all outputs must cite graph nodes; step-by-step explanation and confidence score required.
+- **Prompt design:** Versioned system prompt (analyst role, graph-only facts, mandatory citations, JSON-only output); user prompt = structured context (serialized subgraph) + natural-language query. No unstructured “context” other than the graph.
+- **Context injection:** Subgraph selected by query (e.g. device, time range, cluster); serialized as node/edge JSON or triples; injected into prompt with a token limit; no raw logs.
+- **Guardrails:** No tool use or action execution; post-response validation that every citation appears in the injected context; output schema enforced (explanation_steps, summary, confidence, confidence_justification); refusal for out-of-scope or action requests; low-confidence handling (e.g. flag for human review).
+- **Audit:** Every request/response logged (prompt version, query, context node IDs, model, response type, confidence, citation verification result, latency); append-only; retention per policy.
+- **Explanation output:** Structured JSON with steps (claim + citations array), summary, confidence in [0,1], confidence_justification. Citations use canonical graph IDs (did:, evt:, clu:, risk id).
+
+**Detailed design:** [LLM-REASONING-LAYER.md](LLM-REASONING-LAYER.md). **Schemas:** `reasoning/schemas/` (explanation_output.json, audit_log_entry.json).
+
+---
+
+## 13. Hardened Government Deployment
+
+**Purpose:** Air-gapped, signed, audit-compliant deployment for government or high-assurance on-prem environments.
+
+- **Air-gap:** No internet inside boundary; ingress only via controlled media (signed images, signed model packages). Private registry and orchestrator (K8s/OKD or Nomad) on-prem.
+- **Signed containers:** Images signed (e.g. Cosign/Notary) before transfer; registry and/or admission controller enforce signature verification; no unsigned images admitted.
+- **Secure Boot:** UEFI Secure Boot enabled on hosts; measured boot/TPM optional for attestation. Verification step in deployment checklist.
+- **Audit logging:** Centralized, structured, append-only; retention per policy; no egress. Schema aligned with compliance (e.g. NIST 800-53 AU-*).
+- **Offline model update:** Signed model package on media → verify with model signing public key → load into model registry; no autonomous pull from internet.
+- **FIPS-aligned crypto:** TLS with FIPS-approved ciphers; SHA-256/384 for signatures; encryption at rest with FIPS-validated modules where required; key storage in HSM/TPM.
+- **Compliance mapping:** Checklist mapping to NIST 800-53, FedRAMP/CISA, and FIPS (see design doc §3).
+- **Supply chain:** Build → sign → export to media → import inside boundary → verify signature → deploy. Model package same flow.
+- **IaC:** Terraform for cluster provisioning (state in-boundary); Ansible for OS hardening, Secure Boot check, FIPS, audit config, and offline model update procedure.
+
+**Detailed design:** [GOVERNMENT-DEPLOYMENT.md](GOVERNMENT-DEPLOYMENT.md). **IaC:** `deploy/terraform/`, `deploy/ansible/`.
+
+---
+
 ## Document Control
 
 - **Created:** 2025-02-26  
-- **Updated:** 2025-02-26 (Section 8–11: Edge Model, Federated Learning, DSO Graph, Zero-Trust Mesh)  
+- **Updated:** 2025-02-26 (Section 13 Government Deployment)  
 - **Status:** Draft for review  
 - **Next:** Detailed protocol specs (mesh sync, federated rounds), API implementations, and deployment runbooks for single-device vs cluster vs air-gap.

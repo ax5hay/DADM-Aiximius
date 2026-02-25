@@ -1,0 +1,65 @@
+# DADM Fusion — Example hardened deployment (government)
+# Use with private registry; image referenced by digest after signature verification.
+# Enforce Pod Security Standard: restricted (or baseline + constraints).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dadm-fusion
+  namespace: dadm
+  labels:
+    app: dadm-fusion
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dadm-fusion
+  template:
+    metadata:
+      labels:
+        app: dadm-fusion
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: fusion
+          # Use image by digest from internal registry; image must be signed
+          image: registry.dadm.local:5000/dadm-fusion@sha256:...
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: data
+              mountPath: /var/dadm/data
+            - name: config
+              mountPath: /etc/dadm
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: dadm-fusion-data
+        - name: config
+          configMap:
+            name: dadm-fusion-config
+---
+# Namespace with Pod Security Standard (Kubernetes 1.23+)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dadm
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
