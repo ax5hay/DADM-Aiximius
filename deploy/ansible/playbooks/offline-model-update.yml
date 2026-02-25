@@ -19,36 +19,32 @@
 
     - name: Ensure verification script exists
       ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../scripts/verify_model_package.py"
         dest: /usr/local/bin/dadm-verify-model-package
-        content: |
-          #!/usr/bin/env python3
-          """Verify DADM signed model package; exit 0 only if valid."""
-          import json, sys, base64
-          from pathlib import Path
-          # Load package.json (model_blob_b64, metadata, signature_b64)
-          # Load public key from /etc/dadm/model-signing.pub
-          # Verify signature over (model_blob || metadata); exit 1 if invalid
-          pkg_path = Path("{{ model_package_path or dadm_package_dir }}/package.json")
-          if not pkg_path.exists():
-              sys.exit(2)
-          # ... implement with cryptography; sys.exit(1) on failure
-          sys.exit(0)
         mode: '0755'
 
+    - name: Ensure cryptography is installed for verification
+      ansible.builtin.pip:
+        name: cryptography
+        state: present
+      when: model_package_path | length > 0
+
     - name: Run verification
-      ansible.builtin.command: /usr/local/bin/dadm-verify-model-package
+      ansible.builtin.command:
+        cmd: /usr/local/bin/dadm-verify-model-package "{{ model_package_path or dadm_package_dir }}" "{{ dadm_model_signing_pubkey }}"
       register: verify
       changed_when: false
       failed_when: verify.rc != 0
+      when: model_package_path | length > 0
 
     - name: Copy verified model to registry path
       ansible.builtin.copy:
         src: "{{ model_package_path }}/"
         dest: "{{ dadm_model_registry_path | default('/var/dadm/model-registry') }}/"
         mode: '0644'
-      when: verify.rc == 0 and model_package_path | length > 0
+      when: model_package_path | length > 0 and (verify.rc | default(1)) == 0
 
     - name: Notify fusion to reload model registry
       ansible.builtin.debug:
         msg: "Restart fusion service or trigger model reload per deployment docs"
-      when: verify.rc == 0
+      when: model_package_path | length > 0 and (verify.rc | default(1)) == 0

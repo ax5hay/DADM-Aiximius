@@ -1,0 +1,38 @@
+name: Python (training, federated, graph, reasoning, mesh)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+
+      - name: Install test deps
+        run: |
+          pip install pytest
+          pip install -r federated/requirements.txt
+          pip install -r graph/requirements.txt
+          pip install -r reasoning/requirements.txt
+          pip install -r mesh/requirements.txt
+          pip install -r tests/requirements.txt 2>/dev/null || true
+
+      - name: Run unit tests
+        run: pytest tests/unit -v --tb=short
+        env:
+          PYTHONPATH: ${{ github.workspace }}/federated:${{ github.workspace }}/graph:${{ github.workspace }}/reasoning:${{ github.workspace }}

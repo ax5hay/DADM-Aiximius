@@ -41,22 +41,33 @@ def get_store() -> Neo4jStore:
         try:
             store.ensure_indexes()
             _INDEXES_ENSURED = True
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug("ensure_indexes failed (non-fatal): %s", e)
     return store
 
 
 # ---- Ingest ----
+
+def _parse_optional_dt(v: Any) -> Any:
+    if v is None:
+        return None
+    if isinstance(v, datetime):
+        return v
+    if isinstance(v, str):
+        return datetime.fromisoformat(v.replace("Z", "+00:00"))
+    return None
+
 
 @app.route("/api/v1/devices", methods=["POST"])
 def ingest_device():
     body = request.get_json() or {}
     store = get_store()
     d = Device(
-        node_id=body.get("node_id") or device_node_id(body["id"]),
+        node_id=body.get("node_id") or device_node_id(body.get("id", "")),
         platform=body.get("platform", "unknown"),
-        first_seen=body.get("first_seen"),
-        last_seen=body.get("last_seen"),
+        first_seen=_parse_optional_dt(body.get("first_seen")),
+        last_seen=_parse_optional_dt(body.get("last_seen")),
         mesh_id=body.get("mesh_id"),
     )
     store.upsert_device(d)

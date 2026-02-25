@@ -61,22 +61,7 @@
   tasks:
     - name: Ensure model package verify script is present
       ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../scripts/verify_model_package.py"
         dest: /usr/local/bin/dadm-verify-model-package
-        content: |
-          #!/bin/bash
-          # Verify signed model package; exit 0 only if signature valid
-          set -e
-          PKG_DIR="{{ dadm_package_dir | default('/var/dadm/packages') }}"
-          PUBKEY="{{ dadm_model_signing_pubkey_path | default('/etc/dadm/model-signing.pub') }}"
-          for f in "$PKG_DIR"/*.package.json; do
-            [ -f "$f" ] || continue
-            python3 -c "
-          import json, base64, sys
-          from pathlib import Path
-          # Load package and verify signature (implement with cryptography)
-          pkg = json.loads(Path('$f').read_text())
-          # ... verification logic; sys.exit(1) if invalid
-          "
-          done
         mode: '0755'
       tags: model_update

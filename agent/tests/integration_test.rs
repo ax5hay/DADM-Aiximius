@@ -1,12 +1,13 @@
-//! Integration test: config load, pipeline run, feature extract, risk score, no model.
+//! Integration test: config load, pipeline run, feature extract, risk score, uplink, no model.
 
 use dadm_agent::{
-    config::AgentConfig,
+    config::{AgentConfig, UplinkConfig},
     collectors::CollectorPipeline,
     features::FeatureExtractor,
     model::OnnxDetector,
     risk::{RiskEngine, RiskLevel},
     storage::SecureStore,
+    uplink::UplinkClient,
 };
 use std::path::Path;
 
@@ -67,3 +68,30 @@ fn storage_roundtrip() {
     assert_eq!(payload, r#"{"x":1}"#);
     assert_eq!(score, Some(0.5));
 }
+
+#[test]
+fn uplink_client_none_when_disabled() {
+    let config = UplinkConfig {
+        enabled: true,
+        endpoint: None,
+        report_interval_secs: 300,
+        device_id: None,
+    };
+    assert!(UplinkClient::new(config).is_none());
+}
+
+#[test]
+fn uplink_client_some_when_endpoint_set() {
+    let config = UplinkConfig {
+        enabled: true,
+        endpoint: Some("http://127.0.0.1:9999".to_string()),
+        report_interval_secs: 300,
+        device_id: Some("test-device".to_string()),
+    };
+    let client = UplinkClient::new(config);
+    assert!(client.is_some());
+    let c = client.unwrap();
+    assert!(c.device_id().starts_with("did:"));
+    assert!(c.device_id().contains("test-device"));
+}
+

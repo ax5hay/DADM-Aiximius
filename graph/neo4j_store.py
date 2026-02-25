@@ -4,8 +4,11 @@ Neo4j graph store: create/merge nodes and relationships per DSO schema.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional  # noqa: F401
+
+logger = logging.getLogger(__name__)
 
 from neo4j import GraphDatabase
 
@@ -80,22 +83,22 @@ class Neo4jStore:
                     })
             return {"nodes": nodes_list, "edges": edges_list}
 
-    def ensure_indexes(self):
-        """Create recommended indexes if not exist."""
+    def ensure_indexes(self) -> None:
+        """Create recommended indexes if not exist. Log and skip on failure (e.g. Neo4j version)."""
         index_queries = [
-            "CREATE INDEX device_node_id IF NOT EXISTS FOR (d:Device) ON (d.node_id)",
-            "CREATE INDEX event_event_id IF NOT EXISTS FOR (e:Event) ON (e.event_id)",
-            "CREATE INDEX event_ts IF NOT EXISTS FOR (e:Event) ON (e.ts)",
-            "CREATE INDEX event_device_id IF NOT EXISTS FOR (e:Event) ON (e.device_id)",
-            "CREATE INDEX risk_ts IF NOT EXISTS FOR (r:RiskScore) ON (r.ts)",
-            "CREATE INDEX cluster_id IF NOT EXISTS FOR (c:Cluster) ON (c.cluster_id)",
-            "CREATE INDEX time_window_id IF NOT EXISTS FOR (w:TimeWindow) ON (w.window_id)",
+            ("device_node_id", "CREATE INDEX device_node_id IF NOT EXISTS FOR (d:Device) ON (d.node_id)"),
+            ("event_event_id", "CREATE INDEX event_event_id IF NOT EXISTS FOR (e:Event) ON (e.event_id)"),
+            ("event_ts", "CREATE INDEX event_ts IF NOT EXISTS FOR (e:Event) ON (e.ts)"),
+            ("event_device_id", "CREATE INDEX event_device_id IF NOT EXISTS FOR (e:Event) ON (e.device_id)"),
+            ("risk_ts", "CREATE INDEX risk_ts IF NOT EXISTS FOR (r:RiskScore) ON (r.ts)"),
+            ("cluster_id", "CREATE INDEX cluster_id IF NOT EXISTS FOR (c:Cluster) ON (c.cluster_id)"),
+            ("time_window_id", "CREATE INDEX time_window_id IF NOT EXISTS FOR (w:TimeWindow) ON (w.window_id)"),
         ]
-        for q in index_queries:
+        for name, q in index_queries:
             try:
                 self._run(q)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Index %s skipped: %s", name, e)
 
     def upsert_device(self, d: Device):
         self._run(

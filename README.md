@@ -27,6 +27,7 @@
 - [Repository structure](#repository-structure)
 - [Quick start](#quick-start)
 - [Components](#components)
+- [Testing and CI](#testing-and-ci)
 - [Documentation](#documentation)
 - [Architecture at a glance](#architecture-at-a-glance)
 
@@ -51,49 +52,66 @@
 ```
 DADM-Aiximius/
 ├── agent/                 # Edge agent (Rust)
-│   ├── src/               # Collectors, features, model, storage, risk, logging
+│   ├── src/               # Collectors, features, model, storage, risk, logging, uplink
+│   ├── tests/             # Integration tests (config, pipeline, risk, storage, uplink)
 │   ├── benches/           # Performance benchmarks
 │   └── README.md
 ├── training/              # Anomaly model training (Python)
 │   ├── train.py           # Train autoencoder / Isolation Forest
-│   ├── export_onnx.py     # Export to ONNX
+│   ├── export_onnx.py     # Export to ONNX (anomaly_score wrapper)
 │   ├── quantize.py        # Dynamic quantization
 │   ├── drift.py           # Drift detection
 │   ├── explain.py         # Feature importance / SHAP
 │   └── README.md
 ├── federated/             # Secure federated learning (Python)
 │   ├── client.py          # Encrypted gradient push (no raw logs)
-│   ├── server.py          # Decrypt-only aggregation, versioning, rollback
+│   ├── server.py          # Decrypt-only aggregation, ONNX export (ScoreWrapper), versioning, rollback
 │   ├── crypto_utils.py    # Hybrid encryption, signing
-│   ├── compression.py    # Top-K + quantization
+│   ├── compression.py     # Top-K + quantization
+│   ├── export_signed_package.py  # Air-gap export
 │   └── README.md
 ├── graph/                 # DSO graph engine (Python + Neo4j)
 │   ├── schema.py          # Ontology: Device, Event, RiskScore, Cluster, etc.
-│   ├── neo4j_store.py     # Graph read/write
+│   ├── neo4j_store.py     # Graph read/write, subgraph query, ensure_indexes
 │   ├── risk_propagation.py
-│   ├── clustering.py     # Coordinated anomaly spike detection
-│   ├── api.py             # REST API + dashboard queries
-│   ├── examples/         # Cypher dashboard queries
+│   ├── clustering.py      # Coordinated anomaly spike detection
+│   ├── api.py             # REST API: ingest, batch ingest, subgraph, dashboard, propagate, clusters
+│   ├── examples/          # Cypher dashboard queries
 │   └── README.md
-├── mesh/                  # Zero-trust communication mesh (design + API spec)
-│   ├── openapi.yaml      # Example secure APIs (enrollment, rotation, CRL, gossip, DTN)
+├── mesh/                  # Zero-trust mesh: enrollment server + OpenAPI spec
+│   ├── openapi.yaml       # Secure APIs (enrollment, rotation, CRL, gossip, DTN)
+│   ├── server.py          # Flask: POST /v1/enroll, GET /v1/crl, GET /v1/health
+│   ├── ca_utils.py        # CA key/cert generation, CSR signing
+│   ├── requirements.txt
 │   └── README.md
-├── reasoning/             # LLM reasoning layer (graph-only, citations, no autonomous action)
-│   ├── schemas/          # explanation_output.json, audit_log_entry.json
+├── reasoning/             # LLM reasoning layer (implemented)
+│   ├── app.py             # Flask: POST /v1/reason (subgraph → prompt → LLM → guardrail → audit)
+│   ├── prompts.py         # Versioned system/user prompts
+│   ├── guardrails.py      # Citation validation (all citations in context)
+│   ├── llm_client.py      # OpenAI-compatible or stub LLM
+│   ├── audit.py           # Append-only audit log (schema: audit_log_entry.json)
+│   ├── schemas/           # explanation_output.json, audit_log_entry.json
+│   ├── requirements.txt
 │   └── README.md
-├── deploy/                # Government hardened deployment (Terraform + Ansible)
-│   ├── terraform/        # On-prem cluster provisioning (state in-boundary)
-│   ├── ansible/          # OS hardening, Secure Boot, FIPS, audit, offline model update
+├── deploy/                # Government hardened deployment
+│   ├── terraform/         # On-prem cluster provisioning (state in-boundary)
+│   ├── ansible/           # OS hardening, Secure Boot, FIPS, audit, offline model update
+│   │   ├── playbooks/     # site.yml, offline-model-update.yml
+│   │   └── scripts/       # verify_model_package.py (signature verification with cryptography)
+│   ├── docker/            # Dockerfiles for fusion, graph, reasoning, mesh
 │   └── README.md
-└── docs/                  # Architecture and design
-    ├── ARCHITECTURE.md    # System architecture, security, model lifecycle
-    ├── EDGE-MODEL-DESIGN.md
-    ├── FEDERATED-LEARNING.md
-    ├── DSO-ONTOLOGY.md    # Defense Systems Ontology & graph
-    ├── ZERO-TRUST-MESH.md # TLS, attestation, rotation, revocation, gossip, DTN
-    ├── LLM-REASONING-LAYER.md  # LLM reasoning: prompts, context, guardrails, audit, explanation
-    ├── GOVERNMENT-DEPLOYMENT.md # Air-gap, signed images, Secure Boot, audit, FIPS, IaC
-    └── architecture-diagram.mmd
+├── tests/                 # Unit tests (graph schema, reasoning guardrails, federated crypto, deploy verify)
+│   ├── unit/
+│   └── requirements.txt
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── IMPLEMENTATION-PLAN.md   # Phased plan: agent uplink, fusion ONNX, graph batch/subgraph, reasoning, mesh, compose
+│   ├── RUNBOOK.md              # Full stack runbook: compose, agent uplink, training, reasoning, mesh
+│   └── ... (other design docs)
+├── .github/workflows/     # CI: Rust (fmt, clippy, test), Python (pytest), Lint (ruff, YAML), Docker build, Deploy verify
+├── docker-compose.yml     # Neo4j, Fusion, Graph, Reasoning, Mesh
+├── pyproject.toml         # Ruff config, pytest config
+└── README.md
 ```
 
 ---
@@ -118,7 +136,10 @@ cargo build --release
 ./target/release/dadm-agent
 ```
 
-Uses `config.json` if present; see [agent/README.md](agent/README.md). Requires an ONNX model (train via `training/`).
+- **Config:** `config.json` if present; overrides via env: `DADM_CONFIG_PATH`, `DADM_DATA_DIR`, `DADM_MODEL_PATH`, `DADM_UPLINK_ENABLED`, `DADM_UPLINK_ENDPOINT`, `DADM_DEVICE_ID`.
+- **Modes:** Single shot (default: `process_interval_secs: 0`) or daemon loop when `process_interval_secs > 0` (graceful stop with Ctrl+C).
+- **Uplink:** When `uplink.enabled` and `uplink.endpoint` are set, the agent registers the device and POSTs events and risk scores to the Graph API after each cycle.
+- See [agent/README.md](agent/README.md). Requires an ONNX model (train via `training/` or pull from Fusion).
 
 ### Model training (Python)
 
@@ -155,7 +176,28 @@ cd graph
 pip install -r requirements.txt
 export NEO4J_URI=bolt://localhost:7687 NEO4J_PASSWORD=password
 python api.py
-# GET /api/v1/dashboard/high_risk_devices, coordinated_spikes, surveillance_summary, event_volume
+```
+
+Endpoints: `POST /api/v1/devices`, `POST /api/v1/events`, `POST /api/v1/risk_scores`, `POST /api/v1/ingest/batch`, `GET /api/v1/subgraph?node_id=...&hops=2`, dashboard (`high_risk_devices`, `coordinated_spikes`, `surveillance_summary`, `event_volume`), `POST /api/v1/risk/propagate`, `POST /api/v1/clusters/run`. Indexes are created on first request.
+
+### Reasoning layer (Python)
+
+```bash
+cd reasoning
+pip install -r requirements.txt
+export GRAPH_API_URL=http://localhost:5001
+python app.py
+# POST /v1/reason with {"query": "...", "node_id": "did:..."}  (USE_STUB_LLM=true or set OPENAI_API_KEY)
+```
+
+### Mesh enrollment (Python)
+
+```bash
+cd mesh
+pip install -r requirements.txt
+export MESH_ENROLL_TOKEN=secret
+python server.py
+# POST /v1/enroll (token + CSR), GET /v1/crl
 ```
 
 ---
@@ -164,13 +206,26 @@ python api.py
 
 | Component | Role | Tech |
 |-----------|------|------|
-| **agent** | Edge endpoint: collect process/network/file/privilege events, extract features, run ONNX anomaly model, store encrypted, score risk. | Rust, ONNX Runtime |
-| **training** | Train anomaly model (autoencoder / Isolation Forest); export ONNX; quantize; drift detection; explainability. | Python, PyTorch, ONNX |
-| **federated** | Secure FL: clients send only encrypted gradient updates; server decrypts and aggregates; model versioning and rollback; air-gap export. | Python, Flask, cryptography |
-| **graph** | Defense Systems Ontology: devices, events, risk scores, time windows, clusters. Risk propagation; unsupervised clustering for coordinated spikes; surveillance summary (non-intrusive); REST API. | Python, Neo4j, Flask |
-| **mesh** | Zero-trust communication: TLS 1.3 mutual auth, hardware-backed keys, attestation, certificate rotation, CRL/revocation, encrypted gossip for anomaly signatures, delay-tolerant bundles. Design + OpenAPI spec. | Design, OpenAPI 3.0 |
-| **reasoning** | LLM reasoning over event graph only: step-by-step explanation, mandatory citations, confidence score; no autonomous action; guardrails and audit schema. | Design, JSON schemas |
-| **deploy** | Government hardened deployment: air-gap, signed images, Secure Boot, audit logging, offline model update, FIPS; Terraform + Ansible. | Terraform, Ansible |
+| **agent** | Edge endpoint: collect process/network/file/privilege events, extract features, run ONNX anomaly model, store encrypted, score risk. Optional **uplink** to Graph API (device, events, risk scores). Daemon or single-shot. | Rust, ONNX Runtime, reqwest |
+| **training** | Train anomaly model (autoencoder / Isolation Forest); export ONNX with anomaly_score wrapper; quantize; drift detection; explainability. | Python, PyTorch, ONNX |
+| **federated** | Secure FL: clients send only encrypted gradient updates; server decrypts and aggregates; **ScoreWrapper** ONNX export for agent; versioning and rollback; air-gap export. | Python, Flask, cryptography |
+| **graph** | DSO: devices, events, risk scores, time windows, clusters. **Batch ingest**, **subgraph** endpoint for reasoning; risk propagation; clustering; dashboard; indexes on startup. | Python, Neo4j, Flask |
+| **mesh** | **Enrollment server:** POST /v1/enroll (token + CSR → cert + config), GET /v1/crl. CA and CSR signing. OpenAPI spec for full mesh (gossip, DTN). | Python, Flask, cryptography |
+| **reasoning** | **Flask service:** POST /v1/reason — fetch subgraph from Graph API, build prompt, call LLM (OpenAI or stub), validate schema, citation guardrail, audit log. | Python, Flask, requests |
+| **deploy** | Ansible: **verify_model_package.py** (signature verification with cryptography); Dockerfiles for Fusion, Graph, Reasoning, Mesh; Terraform + Ansible. | Terraform, Ansible, Docker |
+
+---
+
+## Testing and CI
+
+- **Unit tests (Python):** `pytest tests/unit -v` from repo root (PYTHONPATH includes federated, graph, reasoning). Covers graph schema helpers, reasoning guardrails, federated crypto (sign/verify), and the deploy verify script.
+- **Agent tests (Rust):** `cargo test` in `agent/` — config load, pipeline, risk thresholds, ONNX no-model, storage roundtrip, uplink client (new with endpoint vs disabled).
+- **GitHub Actions:** On push/PR to main/master:
+  - **Rust:** `cargo fmt --check`, `cargo clippy`, `cargo test` (agent).
+  - **Python:** `pytest tests/unit` with deps from federated/graph/reasoning/mesh/tests.
+  - **Lint:** Ruff (syntax), YAML check (docker-compose, mesh/openapi.yaml).
+  - **Docker build:** Build Fusion, Graph, Reasoning, Mesh images (no push).
+  - **Deploy verify:** Pytest for `verify_model_package.py` (valid/invalid signature, missing args).
 
 ---
 
@@ -185,6 +240,8 @@ python api.py
 | [ZERO-TRUST-MESH.md](docs/ZERO-TRUST-MESH.md) | Zero-trust mesh: network architecture, auth flow, key lifecycle, enrollment, revocation, gossip, DTN; example secure APIs. |
 | [LLM-REASONING-LAYER.md](docs/LLM-REASONING-LAYER.md) | LLM reasoning: prompt design, structured context injection, guardrails, audit logging schema, explanation outputs (citations, confidence). |
 | [GOVERNMENT-DEPLOYMENT.md](docs/GOVERNMENT-DEPLOYMENT.md) | Hardened gov deployment: architecture, secure containers, compliance checklist, supply chain verification, Terraform/Ansible IaC. |
+| [IMPLEMENTATION-PLAN.md](docs/IMPLEMENTATION-PLAN.md) | Phased implementation: agent daemon/uplink, fusion ONNX, graph batch/subgraph, reasoning service, mesh enrollment, Docker Compose. |
+| [RUNBOOK.md](docs/RUNBOOK.md) | Run the full stack (Compose), agent with uplink, training→ONNX, reasoning (stub/LLM), mesh enrollment, troubleshooting. |
 
 ---
 

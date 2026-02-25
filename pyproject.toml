@@ -1,0 +1,16 @@
+[project]
+name = "dadm"
+version = "0.1.0"
+description = "Distributed AI Defense Mesh"
+readme = "README.md"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E999"]
+ignore = []
+exclude = ["agent", "*.md", "docs", "deploy/terraform", ".github"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["federated", "graph", "reasoning"]

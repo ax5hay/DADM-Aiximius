@@ -62,6 +62,11 @@ pub struct UplinkClient {
 }
 
 impl UplinkClient {
+    /// Device node id (e.g. did:local-device) sent to graph.
+    pub fn device_id(&self) -> &str {
+        &self.device_id
+    }
+
     pub fn new(config: UplinkConfig) -> Option<Self> {
         let endpoint = config.endpoint.as_ref()?.trim_end_matches('/');
         let device_id = config

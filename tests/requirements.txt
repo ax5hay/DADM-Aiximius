@@ -1,0 +1,4 @@
+# For running tests only (unit tests; integration may need neo4j etc.)
+pytest>=7.0.0
+# Dependencies of components under test (already in federated/graph/reasoning)
+cryptography>=41.0.0

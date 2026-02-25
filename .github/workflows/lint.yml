@@ -1,0 +1,47 @@
+name: Lint
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Ruff check
+        run: ruff check . --config pyproject.toml
+
+  yaml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install PyYAML
+        run: pip install pyyaml
+      - name: Check YAML (docker-compose, OpenAPI)
+        run: |
+          python -c "
+          import yaml, sys
+          for p in ['docker-compose.yml', 'mesh/openapi.yaml']:
+            try:
+              with open(p) as f: yaml.safe_load(f)
+              print(p, 'OK')
+            except Exception as e:
+              print(p, e)
+              sys.exit(1)
+          "

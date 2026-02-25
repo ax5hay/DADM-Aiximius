@@ -1,0 +1,60 @@
+name: Docker build (Compose)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Fusion image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.fusion
+          push: false
+          load: true
+          tags: dadm-fusion:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Graph image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.graph
+          push: false
+          load: true
+          tags: dadm-graph:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Reasoning image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.reasoning
+          push: false
+          load: true
+          tags: dadm-reasoning:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Mesh image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.mesh
+          push: false
+          load: true
+          tags: dadm-mesh:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
