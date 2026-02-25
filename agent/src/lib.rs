@@ -15,11 +15,13 @@ pub mod model;
 pub mod storage;
 pub mod risk;
 pub mod logging;
+pub mod uplink;
 
 pub use config::AgentConfig;
 pub use collectors::{Event, EventKind, CollectorPipeline};
 pub use features::{FeatureVector, FeatureExtractor};
 pub use model::OnnxDetector;
 pub use storage::SecureStore;
-pub use risk::RiskEngine;
+pub use risk::{RiskEngine, RiskResult, RiskLevel};
 pub use logging::StructuredLogger;
+pub use uplink::UplinkClient;

@@ -100,6 +100,16 @@ DADM-Aiximius/
 
 ## Quick start
 
+### Run the full stack (Docker Compose)
+
+From the repo root:
+
+```bash
+docker compose up -d
+```
+
+Starts **Neo4j**, **Fusion** (federated server), **Graph API**, **Reasoning** (stub LLM), and **Mesh** (enrollment). See [docs/RUNBOOK.md](docs/RUNBOOK.md) for ports, health checks, and running the agent with uplink to the graph.
+
 ### Edge agent (Rust)
 
 ```bash

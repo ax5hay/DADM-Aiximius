@@ -1,0 +1,75 @@
+# DADM full stack: Neo4j, Fusion (federated), Graph API, Reasoning, Mesh. Agent optional (run on host with uplink to graph).
+version: "3.8"
+
+services:
+  neo4j:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: neo4j/password
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fusion:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.fusion
+    ports:
+      - "5000:5000"
+    environment:
+      PYTHONPATH: /app
+    working_dir: /app
+    volumes:
+      - fusion_registry:/app/registry
+      - fusion_keys:/app/server_keys
+
+  graph:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.graph
+    ports:
+      - "5001:5001"
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: password
+      PORT: 5001
+    depends_on:
+      neo4j:
+        condition: service_healthy
+
+  reasoning:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.reasoning
+    ports:
+      - "5002:5002"
+    environment:
+      GRAPH_API_URL: http://graph:5001
+      PORT: 5002
+      USE_STUB_LLM: "true"
+    depends_on:
+      - graph
+
+  mesh:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.mesh
+    ports:
+      - "5003:5003"
+    environment:
+      MESH_ENROLL_TOKEN: change-me-in-production
+      MESH_DATA_DIR: /app/mesh_data
+      PORT: 5003
+    volumes:
+      - mesh_data:/app/mesh_data
+
+volumes:
+  fusion_registry:
+  fusion_keys:
+  mesh_data:

@@ -29,6 +29,57 @@ class Neo4jStore:
             result = session.run(query, params)
             return [dict(rec) for rec in result]
 
+    def get_subgraph(
+        self, node_id: str, hops: int = 2, window_sec: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Return nodes and edges around node_id within hops. window_sec ignored for now (filter in app)."""
+        _ = window_sec
+        with self._driver.session() as session:
+            max_hops = min(hops, 5)
+            q = """
+            MATCH (start)
+            WHERE start.node_id = $node_id OR start.event_id = $node_id
+            WITH start LIMIT 1
+            MATCH path = (start)-[*0..%d]-(x)
+            RETURN path
+            """ % max_hops
+            result = session.run(q, node_id=node_id)
+            nodes_seen: set = set()
+            edges_seen: set = set()
+            nodes_list: List[Dict[str, Any]] = []
+            edges_list: List[Dict[str, Any]] = []
+            for rec in result:
+                path = rec.get("path")
+                if path is None:
+                    continue
+                for node in path.nodes:
+                    nid = node.element_id if hasattr(node, "element_id") else str(node.id)
+                    if nid in nodes_seen:
+                        continue
+                    nodes_seen.add(nid)
+                    props = dict(node)
+                    for k, v in list(props.items()):
+                        if hasattr(v, "isoformat") and callable(getattr(v, "isoformat")):
+                            props[k] = v.isoformat()
+                        elif v is not None and not isinstance(v, (str, int, float, bool)):
+                            props[k] = str(v)
+                    nodes_list.append({"id": nid, "labels": list(node.labels), "props": props})
+                for rel in path.relationships:
+                    eid = rel.element_id if hasattr(rel, "element_id") else str(rel.id)
+                    if eid in edges_seen:
+                        continue
+                    edges_seen.add(eid)
+                    s = rel.start_node.element_id if hasattr(rel.start_node, "element_id") else str(rel.start_node.id)
+                    t = rel.end_node.element_id if hasattr(rel.end_node, "element_id") else str(rel.end_node.id)
+                    edges_list.append({
+                        "id": eid,
+                        "type": rel.type,
+                        "source": s,
+                        "target": t,
+                        "props": dict(rel),
+                    })
+            return {"nodes": nodes_list, "edges": edges_list}
+
     def ensure_indexes(self):
         """Create recommended indexes if not exist."""
         index_queries = [

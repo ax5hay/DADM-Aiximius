@@ -21,6 +21,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "training"))
 from models import AnomalyAutoencoder  # noqa: E402
 from schema import FEATURE_DIM  # noqa: E402
 
+
+class ScoreWrapper(torch.nn.Module):
+    """Wrapper that outputs anomaly_score(x) so ONNX matches agent expectation [1, 1]."""
+
+    def __init__(self, ae: AnomalyAutoencoder):
+        super().__init__()
+        self.ae = ae
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.ae.anomaly_score(x)
+
 from compression import decompress_gradients
 from crypto_utils import (
     decrypt_at_server,
@@ -172,12 +183,16 @@ def run_aggregation_and_publish():
             state[k] = state[k] - lr * torch.from_numpy(avg_grad[i])
     model.load_state_dict(state)
     SERVER_STATE["global_state"] = {k: v.clone() for k, v in model.state_dict().items()}
-    # Export to ONNX bytes (in-memory)
-    dummy = torch.zeros(1, FEATURE_DIM)
+    # Export to ONNX bytes (anomaly_score output [1,1] for agent)
     import io
+    wrapped = ScoreWrapper(model)
+    dummy = torch.zeros(1, FEATURE_DIM)
     buf = io.BytesIO()
-    torch.onnx.export(model, dummy, buf, input_names=["input"], output_names=["output"],
-                      dynamic_axes=None, opset_version=14)
+    torch.onnx.export(
+        wrapped, dummy, buf,
+        input_names=["input"], output_names=["output"],
+        dynamic_axes=None, opset_version=14,
+    )
     model_blob = buf.getvalue()
     new_version = next_version(SERVER_STATE["model_version"])
     metadata = ModelMetadata(
@@ -195,17 +210,21 @@ def run_aggregation_and_publish():
 
 
 def bootstrap_version_zero():
-    """Create initial signed model v0 so clients can pull."""
+    """Create initial signed model v0 so clients can pull (anomaly_score output for agent)."""
     reg = SERVER_STATE["registry_dir"]
     v0_model = reg / "model_v0.onnx"
     if v0_model.exists():
         return
     import time
-    model = AnomalyAutoencoder(input_dim=FEATURE_DIM, hidden_dims=[32, 16], latent_dim=8, dropout=0.0)
     import io
+    model = AnomalyAutoencoder(input_dim=FEATURE_DIM, hidden_dims=[32, 16], latent_dim=8, dropout=0.0)
+    wrapped = ScoreWrapper(model)
     buf = io.BytesIO()
-    torch.onnx.export(model, torch.zeros(1, FEATURE_DIM), buf, input_names=["input"], output_names=["output"],
-                      dynamic_axes=None, opset_version=14)
+    torch.onnx.export(
+        wrapped, torch.zeros(1, FEATURE_DIM), buf,
+        input_names=["input"], output_names=["output"],
+        dynamic_axes=None, opset_version=14,
+    )
     model_blob = buf.getvalue()
     metadata = ModelMetadata(version=0, base_round=0, created_at=time.time(), schema_version="1.0", rollback_of=None)
     sig = sign_model_package(model_blob, metadata.to_bytes(), SERVER_STATE["signing_priv"])

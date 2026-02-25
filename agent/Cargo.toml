@@ -34,6 +34,10 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# HTTP client for uplink
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+ctrlc = "3.4"
+
 # Cross-platform process/network (best-effort)
 sysinfo = "0.30"
 dirs = "5.0"

@@ -53,10 +53,12 @@ pub struct RiskConfig {
 pub struct UplinkConfig {
     /// Whether uplink is enabled (set by Aiximius server policy, not user)
     pub enabled: bool,
-    /// Endpoint URL when enabled
+    /// Endpoint URL when enabled (e.g. graph API base: http://graph:5001)
     pub endpoint: Option<String>,
     /// Report interval seconds when enabled
     pub report_interval_secs: u64,
+    /// Device ID sent to graph/fusion (default: local-device)
+    pub device_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,7 +88,7 @@ impl Default for CollectorsConfig {
             network: true,
             file_integrity: true,
             privilege: true,
-            process_interval_secs: 5,
+            process_interval_secs: 0, // 0 = single shot; >0 = daemon interval (seconds)
             file_interval_secs: 60,
         }
     }
@@ -116,6 +118,7 @@ impl Default for UplinkConfig {
             enabled: false,
             endpoint: None,
             report_interval_secs: 300,
+            device_id: None,
         }
     }
 }
@@ -130,15 +133,39 @@ impl Default for LogConfig {
 }
 
 impl AgentConfig {
-    /// Load from JSON file if present; otherwise return default
+    /// Load from JSON file if present; otherwise return default. Override with env:
+    /// DADM_CONFIG_PATH, DADM_DATA_DIR, DADM_MODEL_PATH, DADM_UPLINK_ENABLED, DADM_UPLINK_ENDPOINT, DADM_DEVICE_ID
     pub fn load(path: &std::path::Path) -> Self {
-        if path.exists() {
-            if let Ok(data) = std::fs::read_to_string(path) {
+        let path_override = std::env::var("DADM_CONFIG_PATH").ok();
+        let p = path_override.as_deref().map(std::path::Path::new).unwrap_or(path);
+        let mut c = if p.exists() {
+            if let Ok(data) = std::fs::read_to_string(p) {
                 if let Ok(c) = serde_json::from_str::<AgentConfig>(&data) {
-                    return c;
+                    c
+                } else {
+                    Self::default()
                 }
+            } else {
+                Self::default()
             }
+        } else {
+            Self::default()
+        };
+        if let Ok(v) = std::env::var("DADM_DATA_DIR") {
+            c.data_dir = PathBuf::from(v);
         }
-        Self::default()
+        if let Ok(v) = std::env::var("DADM_MODEL_PATH") {
+            c.model_path = PathBuf::from(v);
+        }
+        if let Ok(v) = std::env::var("DADM_UPLINK_ENABLED") {
+            c.uplink.enabled = v == "1" || v.eq_ignore_ascii_case("true");
+        }
+        if let Ok(v) = std::env::var("DADM_UPLINK_ENDPOINT") {
+            c.uplink.endpoint = Some(v);
+        }
+        if let Ok(v) = std::env::var("DADM_DEVICE_ID") {
+            c.uplink.device_id = Some(v);
+        }
+        c
     }
 }

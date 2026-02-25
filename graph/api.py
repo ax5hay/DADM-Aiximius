@@ -28,11 +28,22 @@ from schema import (
 
 app = Flask(__name__)
 
+_INDEXES_ENSURED = False
+
+
 def get_store() -> Neo4jStore:
+    global _INDEXES_ENSURED
     uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
     user = os.environ.get("NEO4J_USER", "neo4j")
     password = os.environ.get("NEO4J_PASSWORD", "password")
-    return Neo4jStore(uri, user, password)
+    store = Neo4jStore(uri, user, password)
+    if not _INDEXES_ENSURED:
+        try:
+            store.ensure_indexes()
+            _INDEXES_ENSURED = True
+        except Exception:
+            pass
+    return store
 
 
 # ---- Ingest ----
@@ -82,6 +93,64 @@ def ingest_risk_score():
     )
     store.upsert_risk_score(r)
     return jsonify({"status": "ok", "id": r.id}), 201
+
+
+@app.route("/api/v1/ingest/batch", methods=["POST"])
+def ingest_batch():
+    """Batch ingest devices, events, risk_scores. Body: { devices: [], events: [], risk_scores: [] }."""
+    body = request.get_json() or {}
+    store = get_store()
+    devices = body.get("devices", [])
+    events = body.get("events", [])
+    risk_scores = body.get("risk_scores", [])
+    for d in devices:
+        dev = Device(
+            node_id=d.get("node_id") or device_node_id(d.get("id", "")),
+            platform=d.get("platform", "unknown"),
+            first_seen=datetime.fromisoformat(d["first_seen"].replace("Z", "+00:00")) if d.get("first_seen") else None,
+            last_seen=datetime.fromisoformat(d["last_seen"].replace("Z", "+00:00")) if d.get("last_seen") else None,
+            mesh_id=d.get("mesh_id"),
+        )
+        store.upsert_device(dev)
+    for e in events:
+        ev = Event(
+            event_id=e.get("event_id") or event_id(e.get("id", "")),
+            kind=e.get("kind", "process"),
+            ts=datetime.fromisoformat(e["ts"].replace("Z", "+00:00")),
+            device_id=e["device_id"],
+            payload_hash=e.get("payload_hash"),
+        )
+        store.upsert_event(ev)
+    for r in risk_scores:
+        rs = RiskScore(
+            id=r.get("id", f"risk_{r.get('device_id', '')}_{r.get('ts', '')}"),
+            score=float(r["score"]),
+            level=r.get("level", "low"),
+            ts=datetime.fromisoformat(r["ts"].replace("Z", "+00:00")),
+            window_start=datetime.fromisoformat(r["window_start"].replace("Z", "+00:00")),
+            window_end=datetime.fromisoformat(r["window_end"].replace("Z", "+00:00")),
+            source=r.get("source", r.get("device_id", "")),
+        )
+        store.upsert_risk_score(rs)
+    return jsonify({
+        "status": "ok",
+        "devices": len(devices),
+        "events": len(events),
+        "risk_scores": len(risk_scores),
+    }), 201
+
+
+@app.route("/api/v1/subgraph")
+def get_subgraph():
+    """Return subgraph around node_id for reasoning layer. Query: node_id, hops (default 2), window_sec (optional)."""
+    node_id = request.args.get("node_id") or request.args.get("node")
+    if not node_id:
+        return jsonify({"error": "missing node_id"}), 400
+    hops = int(request.args.get("hops", 2))
+    window_sec = request.args.get("window_sec", type=int)
+    store = get_store()
+    data = store.get_subgraph(node_id, hops=hops, window_sec=window_sec)
+    return jsonify(data), 200
 
 
 # ---- Risk propagation ----
