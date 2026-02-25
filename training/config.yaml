@@ -1,0 +1,38 @@
+# Edge anomaly model training config
+# Raw sensitive data: server-side only. Edge keeps only features/scores for inference.
+
+feature_schema_version: "1.0"
+feature_dim: 64
+core_features: 12
+
+model:
+  type: autoencoder   # autoencoder | isolation_forest | tiny_transformer
+  hidden_dims: [32, 16]
+  latent_dim: 8
+  dropout: 0.1
+
+training:
+  epochs: 50
+  batch_size: 256
+  lr: 1.0e-3
+  val_split: 0.15
+  seed: 42
+
+onnx:
+  opset: 14
+  input_name: input
+  output_name: output
+  dynamic_axes: null   # fixed [1, 64] for edge
+
+quantization:
+  enabled: true
+  mode: dynamic   # dynamic | static
+
+drift:
+  reference_path: null   # set after first training
+  psi_threshold: 0.25
+  wasserstein_threshold: 0.15
+
+explainability:
+  method: reconstruction_per_feature   # reconstruction_per_feature | kernel_shap
+  shap_n_samples: 100

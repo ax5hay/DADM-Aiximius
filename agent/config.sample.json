@@ -1,0 +1,29 @@
+{
+  "data_dir": ".dadm",
+  "model_path": "model.onnx",
+  "collectors": {
+    "process": true,
+    "network": true,
+    "file_integrity": true,
+    "privilege": true,
+    "process_interval_secs": 5,
+    "file_interval_secs": 60
+  },
+  "features": {
+    "window_events": 100,
+    "feature_dim": 64
+  },
+  "risk": {
+    "high_threshold": 0.8,
+    "medium_threshold": 0.5
+  },
+  "uplink": {
+    "enabled": false,
+    "endpoint": null,
+    "report_interval_secs": 300
+  },
+  "log": {
+    "level": "info",
+    "json": true
+  }
+}

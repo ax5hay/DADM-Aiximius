@@ -1,0 +1,40 @@
+%% DADM — High-level architecture (Mermaid)
+%% Render in any Mermaid-compatible viewer (GitHub, GitLab, VS Code, etc.)
+
+flowchart TB
+    subgraph Edge["Edge layer (consumer devices)"]
+        A[Android Agent]
+        I[iOS Agent]
+        W[Windows Agent]
+        M[macOS Agent]
+        L[Linux Agent]
+    end
+
+    subgraph Mesh["Mesh sync layer"]
+        MS[Mesh Sync / P2P overlay]
+        AGG[Aggregator]
+        REG[Model Registry]
+    end
+
+    subgraph Fusion["Optional central"]
+        FS[Aiximius Fusion Server]
+    end
+
+    subgraph Local["Per-device"]
+        STORE[(Local Store)]
+    end
+
+    A & I & W & M & L --> MS
+    MS --> AGG
+    AGG --> REG
+    REG --> MS
+    MS -.->|optional uplink| FS
+    FS -.->|signed models, policy| MS
+    A & I & W & M & L --> STORE
+    REG --> MS
+    MS --> A & I & W & M & L
+
+    style Edge fill:#e8f4f8
+    style Mesh fill:#f0f8e8
+    style Fusion fill:#f8e8e8
+    style Local fill:#f0e8f8

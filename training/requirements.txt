@@ -1,0 +1,13 @@
+# DADM edge anomaly model training — CPU-only, federated-ready
+torch>=2.0,<2.3
+numpy>=1.24,<2.0
+scikit-learn>=1.3
+onnx>=1.14
+onnxruntime>=1.16
+onnxruntime-tools>=0.1.0
+scipy>=1.11
+pandas>=2.0
+pyyaml>=6.0
+joblib>=1.3
+# optional: federated — flwr>=1.5
+# optional: explainability — shap>=0.43
