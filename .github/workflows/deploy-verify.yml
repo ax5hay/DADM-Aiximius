@@ -17,8 +17,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install cryptography
-        run: pip install cryptography
+      - name: Install dependencies
+        run: pip install pytest cryptography
 
       - name: Run verify script tests
         run: python -m pytest tests/unit/test_deploy_verify_script.py -v --tb=short

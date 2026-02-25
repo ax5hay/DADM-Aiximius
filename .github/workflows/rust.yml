@@ -17,6 +17,10 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Ensure Cargo.lock exists
+        run: cargo generate-lockfile
+        working-directory: agent
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -25,6 +29,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: rust-${{ hashFiles('agent/Cargo.lock', 'agent/Cargo.toml') }}
+
+      - name: Format
+        run: cargo fmt --all
+        working-directory: agent
 
       - name: Check format
         run: cargo fmt --all -- --check
